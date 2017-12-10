@@ -5,7 +5,7 @@ from functools import partial
 
 from . import constants
 
-fontpath = path.join(path.dirname(__file__), "minecraftia", "Minecraftia.ttf")
+
 
 class ColorError(Exception):
     def __init__(self,color):
@@ -50,7 +50,7 @@ class Map():
     
     allcolorsinversemap = constants.allcolorsinversemap
     
-    font = ImageFont.truetype(fontpath,8)
+   
     
     def gendefaultnbt(self):
         '''returns an nbt object'''
