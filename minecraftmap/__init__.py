@@ -23,16 +23,16 @@ class Map():
             self.file = nbt.NBTFile(filename)
         else:
             self.file = self.gendefaultnbt()
-        
+        self.dimension = self.file["data"]["dimension"].value
         self.height = self.file["data"]["height"].value
         self.width = self.file["data"]["width"].value
         self.centerxz = (self.file["data"]["xCenter"].value, self.file["data"]["zCenter"].value)
         self.zoomlevel = self.file["data"]["scale"].value
         self.pixelcenterxy = (self.width/2, self.height/2)
         self.scalemultiplier = self.zoomlevel ** 2
-        self.im = Image.new("RGB",(self.width,self.height))
+        self.im = Image.new("RGBA",(self.width, self.height))
         self.draw = ImageDraw.Draw(self.im)
-        
+
         if constants.alphacolor != self.alphacolor:
             self.gencolors()
         if not eco: self.genimage()
@@ -131,6 +131,9 @@ class Map():
         '''Saves nbt data to original file or to specified filename'''
         if filename or self.file.filename:
             self.file.write_file(filename)
+
+    def rescale(self):
+        self.im = self.im.resize((self.height * 2 ** self.zoomlevel , self.width * 2 ** self.zoomlevel))
     
     
     def getbyte(self,index):
