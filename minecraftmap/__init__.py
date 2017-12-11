@@ -24,8 +24,8 @@ class Map():
         else:
             self.file = self.gendefaultnbt()
         self.dimension = self.file["data"]["dimension"].value
-        self.height = self.file["data"]["height"].value
-        self.width = self.file["data"]["width"].value
+        self.height = 128
+        self.width = 128
         self.centerxz = (self.file["data"]["xCenter"].value, self.file["data"]["zCenter"].value)
         self.zoomlevel = self.file["data"]["scale"].value
         self.pixelcenterxy = (self.width/2, self.height/2)
