@@ -62,12 +62,12 @@ class Map():
         data.tags = [
             nbt.TAG_Int(value=0, name="zCenter"),
             nbt.TAG_Byte(value=1, name="trackingPosition"),
-            nbt.TAG_Short(value=128, name="width"),
+
             nbt.TAG_Byte(value=1, name="scale"),
             nbt.TAG_Byte(value=0, name="dimension"),
             nbt.TAG_Int(value=64, name="xCenter"),
             colors,
-            nbt.TAG_Short(value=128, name="height")
+
             ]
         nbtfile.tags.append(data)
         return nbtfile
@@ -132,8 +132,8 @@ class Map():
         if filename or self.file.filename:
             self.file.write_file(filename)
 
-    def rescale(self):
-        self.im = self.im.resize((self.height * 2 ** self.zoomlevel , self.width * 2 ** self.zoomlevel))
+    def rescale(self, num=1):
+        self.im = self.im.resize((self.height * num * 2 ** self.zoomlevel , self.width * num * 2 ** self.zoomlevel))
     
     
     def getbyte(self,index):
