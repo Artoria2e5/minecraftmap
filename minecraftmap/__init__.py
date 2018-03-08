@@ -1,4 +1,5 @@
 from nbt import nbt
+from nbt.nbt import NBTFile, TAG_Long, TAG_Int, TAG_String, TAG_List, TAG_Compound
 from PIL import Image,ImageDraw,ImageFont
 from os import path
 from functools import partial
@@ -6,6 +7,19 @@ from functools import partial
 from . import constants
 
 fontpath = path.join(path.dirname(__file__), "minecraftia", "Minecraftia.ttf")
+
+def unpack_nbt(tag):
+    """                                                                                                                                                                              
+    Unpack an NBT tag into a native Python data structure.                                                                                                                           
+    """
+    
+    if isinstance(tag, TAG_List):
+        return [unpack_nbt(i) for i in tag.tags]
+    elif isinstance(tag, TAG_Compound):
+        return dict((i.name, unpack_nbt(i)) for i in tag.tags)
+    else:
+        return tag.value
+
 
 class ColorError(Exception):
     def __init__(self,color):
@@ -30,9 +44,13 @@ class Map():
         self.zoomlevel = self.file["data"]["scale"].value
         self.pixelcenterxy = (self.width/2, self.height/2)
         self.scalemultiplier = self.zoomlevel ** 2
+        self.banners = unpack_nbt(self.file["data"].get("banners", {}))
         self.im = Image.new("RGBA",(self.width, self.height))
         self.draw = ImageDraw.Draw(self.im)
-
+        try:
+            self.tag = self.file["data"]["tag"].value
+        except:
+            self.tag = {}
         if constants.alphacolor != self.alphacolor:
             self.gencolors()
         if not eco: self.genimage()
