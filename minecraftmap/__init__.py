@@ -44,7 +44,10 @@ class Map():
         self.zoomlevel = self.file["data"]["scale"].value
         self.pixelcenterxy = (self.width/2, self.height/2)
         self.scalemultiplier = self.zoomlevel ** 2
-        self.banners = unpack_nbt(self.file["data"].get("banners", {}))
+        try:
+            self.banners = unpack_nbt(self.file["data"]["banners"])
+        except:
+            self.banners = []    
         self.im = Image.new("RGBA",(self.width, self.height))
         self.draw = ImageDraw.Draw(self.im)
         try:
