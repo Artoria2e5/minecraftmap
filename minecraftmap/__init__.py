@@ -44,21 +44,29 @@ class Map():
         self.zoomlevel = self.file["data"]["scale"].value
         self.pixelcenterxy = (self.width/2, self.height/2)
         self.scalemultiplier = self.zoomlevel ** 2
+        
         try:
             self.banners = unpack_nbt(self.file["data"]["banners"])
         except:
             self.banners = []    
+        
         self.im = Image.new("RGBA",(self.width, self.height))
         self.draw = ImageDraw.Draw(self.im)
+        
         try:
             self.tag = self.file["data"]["tag"].value
         except:
             self.tag = {}
+        
         if constants.alphacolor != self.alphacolor:
             self.gencolors()
+        
         if not eco: self.genimage()
-    
-    
+
+        try:
+            self.unlimitedTracking = bool(self.file["data"]["unlimitedTracking"].value)    
+        except:
+            self.unlimitedTracking = False
     
     basecolors = constants.basecolors
     
