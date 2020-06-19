@@ -13,7 +13,7 @@ Usage::
  
  # The False eco value indicates that __init__ should run genimage to update im (the PIL image)
  m = minecraftmap.Map(filepath,eco=False)
- 
+
  # The '8' byte in Minecraft's color format is equivalent to (174, 164, 115)
  print(m.allcolors[8]) 
  
