@@ -230,7 +230,8 @@ class Map():
         # Exact hits, or?
         if color in self.allcolorsinversemap:
             return self.allcolorsinversemap[color]
-        elif color in constants.estimationlookupdict
+        elif color in constants.estimationlookupdict:
+
             return constants.estimationlookupdict[color]
         elif color in Map.colorcache:
             return self.colorcache[color]
