@@ -1,6 +1,6 @@
 from nbt import nbt
 from nbt.nbt import NBTFile, TAG_Long, TAG_Int, TAG_String, TAG_List, TAG_Compound
-from PIL import Image,ImageDraw,ImageFont
+from PIL import Image,ImageDraw,ImageFont,ImagePalette
 from os import path
 from functools import partial
 import math
@@ -117,7 +117,7 @@ class Map():
         rgbdata = self.im.getdata()
         try:
             if approximate:
-                if not optimize:
+                if not optimized:
                     lookupindex = 1
                 colordata = bytearray([self.approximate(c, lookupindex) for c in rgbdata])
             else:
@@ -126,11 +126,26 @@ class Map():
         except KeyError as e:
             raise ColorError(e.args[0])
         self.file["data"]["colors"].value = colordata
-    
+
+    def imagetonbt_pil(self, dither=PIL.Image.NONE):
+        """
+        Use PIL to map colors to NBT. This might look better and be quicker...
+
+        The dither value is the same as PIL.Image.convert. We implement NONE by
+        ourselves above, but try FLOYDSTEINBERG too.
+        """
+        (palette_raw, valid_alpha) = self.estimator.get_pil_palette()
+        palette = PIL.ImagePalette(palette=palette_raw, size=len(palette_raw))
+        new_image = self.im.quantize(palette=palette)
+        colordata = bytearray(new_image.tobytes())
+        if not valid_alpha:
+            colordata = bytearray(b + 1 for b in colordata)
+        self.file["data"]["colors"].value = colordata
+
     def saveimagebmp(self,filename):
         '''Saves self.im as a bmp'''
         self.im.save(filename)
-    
+
     def saveimagepng(self,filename):
         '''Saves self.im as png'''
         self.im.save(filename,"PNG")
@@ -161,7 +176,7 @@ class Map():
         index = xy[0] + xy[1]*self.width
         try: return self.file["data"]["colors"].value[index]
         except IndexError: return None
-    
+
     def setpoint(self,xy,value):
         '''Sets nbt image byte at specific (x,y)'''
         index = xy[0] + xy[1]*self.width

@@ -53,11 +53,15 @@ def _round_index(n: Interval, val: int) -> int:
         return math.ceil(255 / n)
     return int(val / n + 0.5)
 
+
+def _is_valid_color(c: Color) -> bool:
+    return all(type(e) == int and e >= 0 and e <= 255 for e in c)
+
+multipliers = [180, 220, 255, 135]
 # This can be changed. If you don't want to use alphacolor at all,
 # pass in something ridiculous like (-256, -256, -256).
 # TODO: Make it not black. An empty map is yellow-ish, not black.
 alphacolor: Color = (0, 0, 0)
-
 # Last updated for Minecraft 1.12.
 basecolors: List[Color] = [
     alphacolor,
@@ -114,8 +118,8 @@ basecolors: List[Color] = [
     ( 37,  22,  16)]
 
 class estimators():
-    def __init__(new_alphacolor):
-        global basecolors
+    def __init__(self, new_alphacolor):
+        global basecolors, multipliers
         self.basecolors: List[Color] = basecolors.copy()
         self.basecolors[0] = new_alphacolor
         self.allcolors: List[Color] = [
@@ -134,9 +138,9 @@ class estimators():
         if self.has_interval(n, usedict=todict):
             return False
         if todict:
-            self.estimationlookup[n] = self.genestimation(n, invmap)
+            self.estimationlookup[n] = self.genestimation(n)
         else:
-            self.estimationlookupdict.update(genestimationdict(n, invmap))
+            self.estimationlookupdict.update(self.genestimationdict(n))
             self.estimationlookupdict['intervals'].add(n)
         return True
 
@@ -175,7 +179,7 @@ class estimators():
                     lookup[(r, g, b)] = i
         return lookup
 
-    def approximate(color: Color, usedict=False, interval=10) -> ColorID:
+    def approximate(self, color: Color, usedict=False, interval=10) -> ColorID:
         '''
         Return a minecraft color code for the color given.
         Interval sets the sample grid size for the approximate maps used.
@@ -195,9 +199,18 @@ class estimators():
                 return self.estimationlookupdict[tuple(_round_index(interval, v) for v in color)]
         else:
             # Seriously approximate.
-            color = min(allcolors, key=partial(colordifference, color))
+            color = min(self.allcolors, key=partial(colordifference, color))
             self.estimationlookupdict[color] = self.allcolorsinversemap[color]
             return self.estimationlookupdict[color]
+
+    def get_pil_palette(self) -> Tuple[bytearray, bool]:
+        """
+        Prepare a raw RGB palette for PIL.
+        """
+        alpha_valid = _is_valid_color(self.allcolors[0])
+        colors = self.allcolors if alpha_valid else self.allcolors[1:]
+        palette = bytearray(c[i] for i in (0, 1, 2) for c in colors)
+        return (palette, alpha_valid)
 
 
 estimators = {
