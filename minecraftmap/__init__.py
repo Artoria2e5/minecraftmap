@@ -239,7 +239,8 @@ class Map():
             # Use interval-approximated approximate. Hard to roll off the tongue.
             if not constants.hasInterval(lookupindex, self.uselookupdict):
                 constants.addestimate(lookupindex, self.uselookupdict)
-            if self.uselookupdict：
+            if self.uselookupdict:
+
                 # Round color to nearest lookupdict-sized blocks.
                 return self.estimationlookupdict[tuple(_round_interval(lookupindex, v) for v in color)]
             else:
