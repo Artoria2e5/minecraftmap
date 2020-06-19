@@ -7,6 +7,7 @@ Simple Python 3 editor for Minecraft maps (the item) in NBT format. Allows editi
 
 Usage::
 
+.. highlight:: python
  import minecraftmap
  filepath = "/Users/spookymushroom/AppData/Roaming/.minecraft/saves/Test World/data/map_0.dat"
  

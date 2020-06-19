@@ -3,6 +3,7 @@ from nbt.nbt import NBTFile, TAG_Long, TAG_Int, TAG_String, TAG_List, TAG_Compou
 from PIL import Image,ImageDraw,ImageFont
 from os import path
 from functools import partial
+import math
 
 from . import constants
 
@@ -10,9 +11,8 @@ fontpath = path.join(path.dirname(__file__), "minecraftia", "Minecraftia.ttf")
 
 def unpack_nbt(tag):
     """                                                                                                                                                                              
-    Unpack an NBT tag into a native Python data structure.                                                                                                                           
+    Unpack an NBT tag into a native Python data structure.
     """
-    
     if isinstance(tag, TAG_List):
         return [unpack_nbt(i) for i in tag.tags]
     elif isinstance(tag, TAG_Compound):
@@ -20,6 +20,23 @@ def unpack_nbt(tag):
     else:
         return tag.value
 
+def _round_interval(n, val):
+    """
+    Round to the nearest interval of n. Or to 255, because that's how _crange works.
+    """
+    if 255 - val < n:
+        return 255
+    return int(val / n + 0.5) * n
+
+
+def _round_index(n, val):
+    """
+    Like _round_interval, but returns an index for nth value.
+    """
+    if 255 - val < n:
+        # Py3 says ceil is int. Great.
+        return math.ceil(255 / n)
+    return int(val / n + 0.5)
 
 class ColorError(Exception):
     def __init__(self,color):
@@ -27,9 +44,20 @@ class ColorError(Exception):
         self.msg = "Could not map color to nbt value: "+str(color)
         super(ColorError,self).__init__(self.msg)
 
-
-
 class Map():
+    basecolors = constants.basecolors
+    allcolors = constants.allcolors
+    alphacolor = constants.alphacolor
+    # Uses estimationlookupdict if True, uses estimationlookup if False
+    # Should not have a real difference on the result, but who knows about performance and Python?
+    # (I am saying that if we finish doing a benchmark we should only keep one)
+    uselookupdict = True
+    allcolorsinversemap = constants.allcolorsinversemap
+    # Same structure as estimationlookupdict, but always best approximate.
+    colorcache = constants.colorcache
+    font = ImageFont.truetype(fontpath,8)
+    colordifference = constants.colordifference
+
     def __init__(self,filename=None,eco=False):
         '''Map class containing nbt data and a PIL Image object, with read/write functionality. Eco means the Image object is not written to upon initialization.'''
         
@@ -60,27 +88,13 @@ class Map():
         
         if constants.alphacolor != self.alphacolor:
             self.gencolors()
-        
         if not eco: self.genimage()
 
         try:
             self.unlimitedTracking = bool(self.file["data"]["unlimitedTracking"].value)    
         except:
             self.unlimitedTracking = False
-    
-    basecolors = constants.basecolors
-    
-    allcolors = constants.allcolors
-    
-    alphacolor = constants.alphacolor
-    
-    #uses estimationlookupdict if True, uses estimationlookup if False
-    uselookupdict = False
-    
-    allcolorsinversemap = constants.allcolorsinversemap
-    
-    font = ImageFont.truetype(fontpath,8)   
-    
+
     def gendefaultnbt(self):
         '''returns an nbt object'''
         nbtfile = nbt.NBTFile()
@@ -100,8 +114,8 @@ class Map():
             ]
         nbtfile.tags.append(data)
         return nbtfile
-    
-    
+
+
     def gencolors(self):
         '''sets allcolors list and allcolorsinversemap to match basecolors,
         and updates all of them to match alphacolor'''
@@ -120,23 +134,33 @@ class Map():
                     newcolor = (r(c[0]*m/255), r(c[1]*m/255), r(c[2]*m/255))
                     self.allcolors.append(newcolor)
                     self.allcolorsinversemap[newcolor] = i*4 + n
-    
+        # Isolate a colorcache.
+        self.colorcache = Map.colorcache.copy()
+        # Remove the ones that are to close to main color (20 in euc dist for now).
+        for color in self.colorcache:
+            if self.colordifference(color, self.alphacolor) < 400 or self.colordifference(color, constants.alphacolor) < 400:
+                del self.colorcache[color]
+
     def genimage(self):
         '''updates self.im'''
         colordata = self.file["data"]["colors"].value
         rgbdata = [self.allcolors[v] for v in colordata]
         self.im.putdata(rgbdata)
-    
+
     def imagetonbt(self,approximate=True,optimized=True,lookupindex=10):
-        '''updates self.file to match self.im, approximations work but take very long, 
-        optimization with constants.estimationlookup[lookupindex] is fast but imperfect'''
+        '''
+        updates self.file to match self.im, approximations work but take very long,
+        optimization with constants.estimationlookup[lookupindex] is fast but imperfect
+
+        :param: lookupindex -- precision (interval) for the optimization. Setting to 1
+                is the same as no optimization.
+        '''
         rgbdata = self.im.getdata()
         try:
             if approximate:
-                if optimized and lookupindex in constants.estimationlookup:
-                    colordata = bytearray([self.approximate(c,lookupindex=lookupindex) for c in rgbdata])
-                else:
-                    colordata = bytearray([self.approximate(c) for c in rgbdata])
+                if not optimize:
+                    lookupindex = 1
+                colordata = bytearray([self.approximate(c, lookupindex) for c in rgbdata])
             else:
                 colordata = bytearray([self.allcolorsinversemap[c] for c in rgbdata])
             
@@ -199,24 +223,27 @@ class Map():
         blockshiftxz = (blockshiftxy[0],blockshiftxy[1])
         blockxz = (blockshiftxz[0]+self.centerxz[0],blockshiftxz[1]+self.centerxz[1])
         return blockxz
-    
-    def colordifference(self,testcolor,comparecolor):
-        '''returns rgb distance squared'''
-        d = ((testcolor[0]-comparecolor[0])**2+
-             (testcolor[1]-comparecolor[1])**2+
-             (testcolor[2]-comparecolor[2])**2)
-        return d
-    
+
     def approximate(self,color,lookupindex=10):
         '''returns best minecraft color code from rgb,
-        lookupindex refers to constants.estimationlookup and can be None'''
-        try:
+        lookupindex refers to constants.estimationlookup and can be None or 1 for no approximation.'''
+        # Exact hits, or?
+        if color in self.allcolorsinversemap:
             return self.allcolorsinversemap[color]
-        except KeyError:
-            if self.uselookupdict and lookupindex in constants.estimationlookupdict:
-                return constants.estimationlookupdict[lookupindex][(color[0]*lookupindex//255,color[1]*lookupindex//255,color[2]*lookupindex//255)]
-            elif not self.uselookupdict and lookupindex in constants.estimationlookup:
-                return constants.estimationlookup[lookupindex][color[0]*lookupindex//255][color[1]*lookupindex//255][color[2]*lookupindex//255]
+        elif color in constants.estimationlookupdict
+            return constants.estimationlookupdict[color]
+        elif color in Map.colorcache:
+            return self.colorcache[color]
+        elif lookupindex is None or lookupindex != 1:
+            # Use interval-approximated approximate. Hard to roll off the tongue.
+            if not constants.hasInterval(lookupindex, self.uselookupdict):
+                constants.addestimate(lookupindex, self.uselookupdict)
+            if self.uselookupdict：
+                # Round color to nearest lookupdict-sized blocks.
+                return self.estimationlookupdict[tuple(_round_interval(lookupindex, v) for v in color)]
             else:
-                color = min(self.allcolors,key=partial(self.colordifference,color))
-                return self.allcolorsinversemap[color]
+                return self.estimationlookupdict[tuple(_round_index(lookupindex, v) for v in color)]
+        else:
+            # Do the real serious lookup and cache it.
+            self.colorcache[color] = constants.approximate(color, self.allcolorsinversemap)
+            return self.colorcache[color]
