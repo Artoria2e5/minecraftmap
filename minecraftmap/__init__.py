@@ -127,7 +127,7 @@ class Map():
             raise ColorError(e.args[0])
         self.file["data"]["colors"].value = colordata
 
-    def imagetonbt_pil(self, dither=PIL.Image.NONE):
+    def imagetonbt_pil(self, dither=ditherImage.NONE):
         """
         Use PIL to map colors to NBT. This might look better and be quicker...
 
@@ -135,7 +135,7 @@ class Map():
         ourselves above, but try FLOYDSTEINBERG too.
         """
         (palette_raw, valid_alpha) = self.estimator.get_pil_palette()
-        palette = PIL.ImagePalette(palette=palette_raw, size=len(palette_raw))
+        palette = ImagePalette(palette=palette_raw, size=len(palette_raw))
         new_image = self.im.quantize(palette=palette)
         colordata = bytearray(new_image.tobytes())
         if not valid_alpha:
@@ -161,8 +161,7 @@ class Map():
 
     def rescale(self, num=1):
         self.im = self.im.resize((self.height * num * 2 ** self.zoomlevel , self.width * num * 2 ** self.zoomlevel))
-    
-    
+
     def getbyte(self,index):
         '''Gets nbt image byte at index, returns None if out of range'''
         return self.file["data"]["colors"].value[index]

@@ -3,7 +3,7 @@
 All the color approximation logic go here.
 """
 from functools import partial, reduce
-from itertools import chain
+from itertools import chain, product
 from typing import List, Dict, Tuple, Union, Set, Iterable, NewType
 import math
 import copy
@@ -12,7 +12,7 @@ Color = Tuple[int, int, int]
 ColorID = NewType('ColorID', int)
 Interval = NewType('Interval', int)
 ColorMap = Dict[Color, ColorID]
-# TypedDict is not enough. Oof.
+# TypedDict is not enough. Oof. (This is more appropriately a subclass.)
 ColorMapWithInterval = Dict[Union[Color, str], Union[ColorID, Set[Interval]]]
 ColorLUT = Dict[Interval, List[List[List[ColorID]]]]
 
@@ -25,7 +25,7 @@ def _factors(n: int) -> Set[int]:
     return set(reduce(list.__add__,
                 ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
 
-def colordifference(testcolor, comparecolor) -> int:
+def colordifference(testcolor: Color, comparecolor: Color) -> int:
     '''returns euclidean rgb distance squared'''
     d = ((testcolor[0] - comparecolor[0])**2 +
          (testcolor[1] - comparecolor[1])**2 +
@@ -126,43 +126,48 @@ class estimators():
             multiplyColor(color, multiplier)
             for color in basecolors for multiplier in multipliers
         ]
-        self.allcolorsinversemap: ColorMap = {color: index for index, color in enumerate(allcolors)}
+        self.allcolorsinversemap: ColorMap = {color: index for index, color in enumerate(self.allcolors)}
         # Key: interval (integer); Value: three-dimension array for approximate MC color codes
         self.estimationlookup: ColorLUT = {}
         # Key: color (tuple); Value: MC color codes
         # Special key: 'intervals'; Value: set of available intervals.
-        self.estimationlookupdict: ColorMapWithInterval = {'intervals': set(1)}
+        self.estimationlookupdict: ColorMapWithInterval = {'intervals': set()}
 
     def addestimate(self, n: Interval, todict=False) -> bool:
         '''Add estimate for interval n, if it's not already there. Returns whether any update was done.'''
         if self.has_interval(n, usedict=todict):
             return False
         if todict:
-            self.estimationlookup[n] = self.genestimation(n)
+            self.estimationlookup[n] = self._genestimation(n)
         else:
-            self.estimationlookupdict.update(self.genestimationdict(n))
+            self.estimationlookupdict.update(self._genestimationdict(n))
             self.estimationlookupdict['intervals'].add(n)
         return True
 
-    def has_interval(self, n: Interval, usedict=False) -> bool:
+    def has_interval(self, n: Interval, usedict=False, digdict=False) -> bool:
         """Do we have this interval of information?"""
-        assert n > 1
+        assert n > 1 or (usedict and digdict)
         if usedict:
             return n in self.estimationlookup
         else:
             factors = _factors(n)
             # With the dict we can accomondate many levels of precision.
             # Precision level 5 and 2 naturally serves precision level 10.
-            return any(f in self.estimationlookupdict['intervals'] for f in factors)
+            if any(f in self.estimationlookupdict['intervals'] for f in factors):
+                return True
+            elif digdict and all(c in self.estimationlookupdict for c in product(_crange(0, 256, n), repeat=3)):
+                self.estimationlookupdict['intervals'].add(n)
+                return True
+            return False
 
     def _genestimation(self, n: Interval) -> ColorMap:
         '''returns a nested list by estimating approximate() on interval n in every axis'''
         rl = []
-        for rn in _crange(0, 256, n):
+        for r in _crange(0, 256, n):
             gl = []
-            for gn in _crange(0, 256, n):
+            for g in _crange(0, 256, n):
                 bl = []
-                for bn in _crange(0, 256, n):
+                for b in _crange(0, 256, n):
                     i = self.approximate((r, g, b), interval=1)
                     bl.append(i)
                 gl.append(bl)
@@ -172,9 +177,9 @@ class estimators():
     def _genestimationdict(self, n: Interval) -> ColorLUT:
         '''returns a dict with indexes (r,g,b) by estimating approximate() on interval n in every axis'''
         lookup = {}
-        for rn in _crange(0, 256, n):
-            for gn in _crange(0, 256, n):
-                for bn in _crange(0, 256, n):
+        for r in _crange(0, 256, n):
+            for g in _crange(0, 256, n):
+                for b in _crange(0, 256, n):
                     i = self.approximate((r, g, b), interval=1)
                     lookup[(r, g, b)] = i
         return lookup
